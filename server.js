@@ -1121,6 +1121,11 @@ app.get('/api/report/overview', auth, requireRole('admin'), wrap(async (_req, re
 
 // ---------- start ----------
 const PORT = process.env.PORT || 4000
+// Listen FIRST so the service comes online immediately (Railway routes traffic
+// only once the port is bound). Then run the idempotent migration in the
+// background — if it fails, log it but keep serving (the schema/data already
+// exist on a deployed DB, so the API still works).
+app.listen(PORT, () => console.log(`TutorIQ API running on port ${PORT}`))
 migrate()
-  .then(() => app.listen(PORT, () => console.log(`TutorIQ API running on port ${PORT}`)))
-  .catch((e) => { console.error('Migration failed:', e); process.exit(1) })
+  .then(() => console.log('✓ migration complete'))
+  .catch((e) => console.error('Migration failed (server still running):', e))

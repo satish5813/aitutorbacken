@@ -25,7 +25,13 @@ export async function migrate() {
       await new Promise((r) => setTimeout(r, 3000))
     }
   }
-  await conn.query(`CREATE DATABASE IF NOT EXISTS \`${dbConfig.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`)
+  // Managed hosts (Railway) pre-create the database and the user often can't run
+  // CREATE DATABASE — treat that as non-fatal and just use the existing one.
+  try {
+    await conn.query(`CREATE DATABASE IF NOT EXISTS \`${dbConfig.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`)
+  } catch (e) {
+    console.warn(`CREATE DATABASE skipped (${e.code || e.message}) — using existing database`)
+  }
   await conn.query(`USE \`${dbConfig.database}\`;`)
   await conn.query('SET FOREIGN_KEY_CHECKS=0;\n' + schema + '\nSET FOREIGN_KEY_CHECKS=1;')
   await conn.end()
