@@ -12,9 +12,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 export async function migrate() {
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8')
 
-  // ensure the database exists, then run the schema (FK checks off so table
-  // order doesn't matter), all on a one-off multi-statement connection.
-  const conn = await mysql.createConnection({ ...dbConfig, database: undefined, multipleStatements: true })
+  // Connect with a few retries — on a fresh deploy the database can take a
+  // moment to accept connections (avoids a crash-on-cold-start race).
+  let conn
+  for (let attempt = 1; ; attempt++) {
+    try {
+      conn = await mysql.createConnection({ ...dbConfig, database: undefined, multipleStatements: true })
+      break
+    } catch (e) {
+      if (attempt >= 8) throw e
+      console.log(`DB not ready (attempt ${attempt}/8: ${e.code || e.message}) — retrying in 3s…`)
+      await new Promise((r) => setTimeout(r, 3000))
+    }
+  }
   await conn.query(`CREATE DATABASE IF NOT EXISTS \`${dbConfig.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`)
   await conn.query(`USE \`${dbConfig.database}\`;`)
   await conn.query('SET FOREIGN_KEY_CHECKS=0;\n' + schema + '\nSET FOREIGN_KEY_CHECKS=1;')
