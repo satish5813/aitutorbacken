@@ -23,6 +23,14 @@ export const dbConfig = url ? fromUrl(url) : {
   database: process.env.DB_NAME || process.env.MYSQLDATABASE || 'tutoriq',
 }
 
+// Log the DB TARGET (host/port/db only — never the password) so you can see on
+// Railway whether DATABASE_URL took effect. If this prints "localhost", the
+// DATABASE_URL variable is NOT set on the backend service yet.
+console.log(`[db] target → ${dbConfig.host}:${dbConfig.port}/${dbConfig.database} (user ${dbConfig.user})`)
+if (dbConfig.host === 'localhost' && process.env.RAILWAY_ENVIRONMENT) {
+  console.warn('[db] WARNING: still pointing at localhost on Railway — set DATABASE_URL = ${{MySQL.MYSQL_URL}} on this service.')
+}
+
 export const pool = mysql.createPool({
   ...dbConfig,
   waitForConnections: true,
