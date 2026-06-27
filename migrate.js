@@ -37,6 +37,14 @@ export async function migrate() {
   await conn.end()
   console.log('✓ schema ready (' + (schema.match(/CREATE TABLE/g) || []).length + ' tables)')
 
+  // ensure newer columns exist on already-deployed databases
+  // (CREATE TABLE IF NOT EXISTS won't add columns to a table that already exists)
+  for (const alter of [
+    'ALTER TABLE contents ADD COLUMN video_ok TINYINT(1) NOT NULL DEFAULT 1',
+  ]) {
+    try { await q(alter) } catch (e) { if (!/duplicate|exists/i.test(e.message)) console.warn('migrate alter skipped:', e.message) }
+  }
+
   // seed a default super admin if none exists
   const admins = await q("SELECT id FROM users WHERE role='admin' LIMIT 1")
   if (admins.length === 0) {

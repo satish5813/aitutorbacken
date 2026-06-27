@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS `contents` (
   `transcript` mediumtext COLLATE utf8mb4_unicode_ci,
   `text_content` mediumtext COLLATE utf8mb4_unicode_ci,
   `quiz_json` mediumtext COLLATE utf8mb4_unicode_ci,
+  `video_ok` tinyint(1) NOT NULL DEFAULT '1',
   PRIMARY KEY (`id`),
   KEY `idx_contents_session` (`session_id`),
   CONSTRAINT `contents_ibfk_1` FOREIGN KEY (`session_id`) REFERENCES `sessions` (`id`) ON DELETE CASCADE

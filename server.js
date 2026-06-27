@@ -685,7 +685,7 @@ app.get('/api/student/courses/:id/sessions', auth, wrap(async (req, res) => {
   const sessions = await q('SELECT id, title, order_no FROM sessions WHERE course_id=? ORDER BY order_no', [req.params.id])
   for (const s of sessions) {
     s.contents = await q(
-      'SELECT id, type, title, url, storage_path, order_no, transcript, text_content, quiz_json FROM contents WHERE session_id=? ORDER BY order_no',
+      "SELECT id, type, title, url, storage_path, order_no, transcript, text_content, quiz_json FROM contents WHERE session_id=? AND NOT (type='youtube' AND video_ok=0) ORDER BY order_no",
       [s.id])
   }
   res.json(sessions)
@@ -706,11 +706,42 @@ app.get('/api/student/courses/:id/modules', auth, wrap(async (req, res) => {
       : await q('SELECT id, title, order_no FROM sessions WHERE module_id=? ORDER BY order_no', [m.id])
     for (const s of sessions) {
       s.contents = await q(
-        'SELECT id, type, title, url, storage_path, order_no, transcript, text_content, quiz_json FROM contents WHERE session_id=? ORDER BY order_no', [s.id])
+        "SELECT id, type, title, url, storage_path, order_no, transcript, text_content, quiz_json FROM contents WHERE session_id=? AND NOT (type='youtube' AND video_ok=0) ORDER BY order_no", [s.id])
     }
     if (sessions.length) out.push({ ...m, sessions })
   }
   res.json(out)
+}))
+
+// ---- video availability: hide private/unavailable YouTube videos from students ----
+const ytId = (u) => { u = (u || '').trim(); return u.match(/(?:youtu\.be\/|\/embed\/|\/shorts\/|\/live\/|[?&]v=)([A-Za-z0-9_-]{11})/)?.[1] || (u.match(/^[A-Za-z0-9_-]{11}$/) ? u : null) }
+
+// re-check every YouTube video's embeddability and flag unavailable ones (run after
+// faculty make a video public; the student app then shows/hides it accordingly)
+app.post('/api/videos/recheck', auth, requireRole('admin', 'faculty'), wrap(async (_req, res) => {
+  const vids = await q("SELECT id, url FROM contents WHERE type='youtube'")
+  let available = 0, unavailable = 0
+  for (const v of vids) {
+    const id = ytId(v.url)
+    let good = false
+    if (id) {
+      try { good = (await fetch('https://www.youtube.com/oembed?url=https://youtu.be/' + id + '&format=json')).status === 200 } catch { /* network error → unavailable */ }
+    }
+    await q('UPDATE contents SET video_ok=? WHERE id=?', [good ? 1 : 0, v.id])
+    good ? available++ : unavailable++
+  }
+  res.json({ checked: vids.length, available, unavailable })
+}))
+
+// list unavailable videos (admin = all, faculty = their own courses) so they know what to fix
+app.get('/api/videos/status', auth, requireRole('admin', 'faculty'), wrap(async (req, res) => {
+  const base = `SELECT ct.id, ct.url, ct.title, co.id AS course_id, co.title AS course
+    FROM contents ct JOIN sessions s ON s.id = ct.session_id JOIN courses co ON co.id = s.course_id`
+  const rows = req.user.role === 'admin'
+    ? await q(base + " WHERE ct.type='youtube' AND ct.video_ok=0 ORDER BY co.title")
+    : await q(base + ` JOIN faculty_course fc ON fc.course_id = co.id
+        WHERE fc.faculty_id = ? AND ct.type='youtube' AND ct.video_ok=0 ORDER BY co.title`, [req.user.id])
+  res.json(rows)
 }))
 
 // ---- PPT → PDF (LibreOffice) so slides render reliably in the book viewer ----
