@@ -672,9 +672,9 @@ app.delete('/api/enrollments/:id', auth, wrap(async (req, res) => {
 // ===================================================================
 app.get('/api/student/courses', auth, wrap(async (req, res) => {
   res.json(await q(`
-    SELECT c.id, c.title, c.description FROM courses c
+    SELECT c.id, c.title, c.description, c.code, c.academic_year, c.year, c.sem FROM courses c
     JOIN enrollments e ON e.course_id = c.id
-    WHERE LOWER(e.student_email) = LOWER(?) ORDER BY c.title`, [req.user.email]))
+    WHERE LOWER(e.student_email) = LOWER(?) ORDER BY c.year, c.sem, c.title`, [req.user.email]))
 }))
 
 app.get('/api/student/courses/:id/sessions', auth, wrap(async (req, res) => {
