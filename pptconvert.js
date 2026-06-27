@@ -3,6 +3,7 @@ import { execFile } from 'child_process'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import { pathToFileURL } from 'url'
 
 const CANDIDATES = [
   process.env.SOFFICE_PATH,
@@ -27,9 +28,14 @@ export async function pptxToPdf(buffer, name = 'deck.pptx') {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ppt-'))
   const inFile = path.join(dir, (name || 'deck.pptx').replace(/[^\w.\-]/g, '_'))
   fs.writeFileSync(inFile, buffer)
+  // headless LibreOffice needs a writable profile dir + HOME; containers often
+  // have a read-only/empty HOME, which makes conversion fail. Point both at our
+  // temp dir so it works the same on a server as on a desktop.
+  const profile = pathToFileURL(path.join(dir, 'profile')).href
   await new Promise((resolve, reject) =>
-    execFile(soffice, ['--headless', '--convert-to', 'pdf', '--outdir', dir, inFile],
-      { timeout: 90000 }, (e) => (e ? reject(e) : resolve())))
+    execFile(soffice,
+      ['--headless', '--norestore', '-env:UserInstallation=' + profile, '--convert-to', 'pdf', '--outdir', dir, inFile],
+      { timeout: 120000, env: { ...process.env, HOME: dir } }, (e) => (e ? reject(e) : resolve())))
   const pdfFile = inFile.replace(/\.[^.]+$/, '.pdf')
   const pdf = fs.readFileSync(pdfFile)
   try { fs.rmSync(dir, { recursive: true, force: true }) } catch { /* ignore */ }

@@ -1,0 +1,4 @@
+# Install headless LibreOffice so the backend can convert PPT/PPTX -> PDF
+# for the in-app slide viewer. (Nixpacks still auto-detects Node on top of this.)
+[phases.setup]
+aptPkgs = ["libreoffice-impress", "libreoffice-core", "fonts-liberation", "fonts-dejavu"]
