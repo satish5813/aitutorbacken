@@ -45,6 +45,19 @@ export async function migrate() {
     try { await q(alter) } catch (e) { if (!/duplicate|exists/i.test(e.message)) console.warn('migrate alter skipped:', e.message) }
   }
 
+  // AI Tutor per-session chat log — drives conversation history + the per-student question limit
+  try {
+    await q(`CREATE TABLE IF NOT EXISTS tutor_chat (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      session_id INT NOT NULL,
+      role VARCHAR(12) NOT NULL,
+      content MEDIUMTEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_tutor_chat_us (user_id, session_id)
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`)
+  } catch (e) { console.warn('tutor_chat table skipped:', e.message) }
+
   // seed a default super admin if none exists
   const admins = await q("SELECT id FROM users WHERE role='admin' LIMIT 1")
   if (admins.length === 0) {

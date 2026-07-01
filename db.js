@@ -33,6 +33,7 @@ if (dbConfig.host === 'localhost' && process.env.RAILWAY_ENVIRONMENT) {
 
 export const pool = mysql.createPool({
   ...dbConfig,
+  charset: 'utf8mb4',           // full multi-language + emoji support (AI Tutor chat)
   waitForConnections: true,
   connectionLimit: 10,
 })
